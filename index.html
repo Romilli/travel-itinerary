@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MapTiler Route Demo</title>
+  <link href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+  <style>
+    body, html { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; }
+    #map { width: 100%; height: 100vh; }
+    .panel {
+      position: absolute; top: 12px; left: 12px; z-index: 2;
+      background: rgba(255,255,255,0.95); padding: 10px; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    }
+    .btn { display:inline-block; padding:6px 10px; border-radius:6px; border:1px solid #ddd; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="panel">
+    <strong>MapTiler Route Demo</strong><br>
+    <div style="margin-top:8px">
+      <button id="fit" class="btn">ルートを表示</button>
+    </div>
+  </div>
+
+  <script>
+    const MAPTILER_KEY = 'oOItToAZ0tFojV2nJjns';
+
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: `https://api.maptiler.com/maps/streets-v4/style.json?key=${MAPTILER_KEY}`,
+      center: [137.2137, 36.6952],
+      zoom: 12
+    });
+    map.setMinZoom(9);
+    map.setMaxZoom(15);
+
+    const locationData = [
+      { name: "Point A", lat: 36.6950, lng: 137.2116, rev_val: 4.2, rev_num: 6126, req_time: 90 },
+      { name: "Point B", lat: 36.6896, lng: 137.2152, rev_val: 4.0, rev_num: 3000, req_time: 50 },
+      { name: "Point C", lat: 36.6870, lng: 137.2190, rev_val: 3.8, rev_num: 2000, req_time: 40 },
+      { name: "Point D", lat: 36.6875, lng: 137.2260, rev_val: 4.4, rev_num: 1000, req_time: 30 },
+      { name: "Point E", lat: 36.6890, lng: 137.2350, rev_val: 4.1, rev_num: 500, req_time: 20 }
+    ];
+
+    const order = [0,1,2,3,4];
+    const colors = ["#e74c3c", "#3498db", "#f1c40f", "#2ecc71", "#9b59b6"];
+    let markers = [];
+
+    map.on('load', () => {
+      // ピン表示
+      order.forEach((locIdx, step) => {
+        const loc = locationData[locIdx];
+        if (!loc) return;
+        const color = colors[step % colors.length];
+        const position = [loc.lng, loc.lat];
+
+        const markerEl = document.createElement("div");
+        markerEl.style.width = "18px";
+        markerEl.style.height = "18px";
+        markerEl.style.borderRadius = "50%";
+        markerEl.style.backgroundColor = color;
+        markerEl.style.border = "2px solid white";
+        markerEl.style.color = "white";
+        markerEl.style.fontSize = "14px";
+        markerEl.style.fontWeight = "bold";
+        markerEl.style.display = "flex";
+        markerEl.style.justifyContent = "center";
+        markerEl.style.alignItems = "center";
+        markerEl.style.cursor = "pointer";
+        markerEl.innerText = step + 1;
+
+        const marker = new maplibregl.Marker({ element: markerEl }).setLngLat(position).addTo(map);
+        const popupHtml = `<div style=\"font-size:14px;\"><b>${step+1}. ${loc.name}</b><br>評価: ${loc.rev_val} (${loc.rev_num}件)<br>所要時間: 約${loc.req_time}分</div>`;
+        const popup = new maplibregl.Popup({ offset: 10 }).setHTML(popupHtml);
+        marker.getElement().addEventListener("click", () => { popup.setLngLat(position).addTo(map); });
+        markers.push(marker);
+      });
+
+      // ルート表示（各区間の始点ピン色で）
+      for (let i = 0; i < order.length - 1; i++) {
+        const startIdx = order[i];
+        const endIdx = order[i+1];
+        const coords = [[locationData[startIdx].lng, locationData[startIdx].lat], [locationData[endIdx].lng, locationData[endIdx].lat]];
+        const color = colors[i % colors.length];
+
+        map.addSource('route' + i, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } });
+        map.addLayer({
+          id: 'route' + i + '-line',
+          type: 'line',
+          source: 'route' + i,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': color, 'line-width': 3 }
+        });
+      }
+
+      // 全体を画面に収める
+      document.getElementById('fit').addEventListener('click', () => {
+        const bounds = order.reduce((b, idx) => b.extend([locationData[idx].lng, locationData[idx].lat]), new maplibregl.LngLatBounds([locationData[order[0]].lng, locationData[order[0]].lat], [locationData[order[0]].lng, locationData[order[0]].lat]));
+        map.fitBounds(bounds, { padding: 40 });
+      });
+    });
+  </script>
+</body>
+</html>
