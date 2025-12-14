@@ -1,107 +1,1409 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MapTiler Route Demo</title>
+  <meta charset="utf-8"/>
+  <title>ルート表示（ローカルJSON＋訪問順マーカー）</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
   <link href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
   <style>
-    body, html { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; }
-    #map { width: 100%; height: 100vh; }
-    .panel {
-      position: absolute; top: 12px; left: 12px; z-index: 2;
-      background: rgba(255,255,255,0.95); padding: 10px; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    
+    html, body {
+      height: 100%;
+      margin: 0;
     }
-    .btn { display:inline-block; padding:6px 10px; border-radius:6px; border:1px solid #ddd; cursor:pointer; }
+
+    
+    body {
+      font-family: "Noto Sans JP", system-ui, -apple-system;
+      display: flex;
+      flex-direction: column;
+    }
+    #map {
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      overscroll-behavior: none;
+    }
+
+    header {
+      position: static;
+      top: env(safe-area-inset-top);
+      z-index: 1000;
+    
+      background: #f8f8f8;
+      padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    header label { font-size: 14px; margin-right: 0px; }
+    header input, header select { padding: 4px 6px; font-size: 14px; }
+    header button {
+      background: #0078ff;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    header button:hover { background: #005fcc; }
+    
+    /* 半改行 */
+    .half-space { margin-bottom: 0.5em;}
+
+    /* モーダル関連 */
+    .modal {
+      display: none; /* 初期は非表示 */
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto; /* スクロール可能にする */
+      background-color: rgba(0,0,0,0.5);
+    }
+    
+    .modal-content {
+      background-color: #fff;
+      margin: 5% auto;
+      padding: 20px;
+      max-width: 800px;
+      border-radius: 8px;
+      overflow-x: auto; /* 横スクロール対応 */
+    }
+    
+    .close {
+      float: right;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close:hover { color: #000; }
+    
+    .address-row {
+      font-size: 13px;
+      color: #555;
+      background: #fafafa;
+      border-top: none;
+    }
+    
+    .address-row td {
+      border-left: none;
+      border-right: none;
+    }
+    
+    .move-row {
+      background: #BBFFB5;
+      text-align: center;
+    }
+
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+    }
+    
+    th {
+      background-color: #f0f0f0;
+    }
+    
+    #showDetailsBtn {
+      background: #00aa55;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    #showDetailsBtn:hover {
+      background: #008844; /* 暗くする */
+    }
+    
+    /* ローディングオーバーレイ */
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(255, 255, 255, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      display: none;
+    }
+
   </style>
 </head>
 <body>
+  
+  <header>
+    <button id="preferenceBtn">入力値を設定</button>
+    <button id="showRouteBtn">ルートを計算して表示</button>
+    <button id="showDetailsBtn">時間割表示</button>
+  </header>
+
   <div id="map"></div>
-  <div class="panel">
-    <strong>MapTiler Route Demo</strong><br>
-    <div style="margin-top:8px">
-      <button id="fit" class="btn">ルートを表示</button>
+
+  <!-- モーダル -->
+  <!--時間割モーダル-->
+  <div id="timeTableModal" class="modal">
+    
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>時間割表示</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>地点名</th>
+              <th>滞在時間</th>
+              <th>到着時間</th>
+              <th>出発時間</th>
+            </tr>
+          </thead>
+          <tbody id="routeDetailsBody"></tbody>
+        </table>
+      </div>
+    </div>
+    
+  </div>
+  <!--嗜好パラメータモーダル-->
+  <div id="preferenceModal" class="modal">
+    <div class="modal-content">
+      
+      <span class="close" id="closePrefModal">&times;</span>
+      
+      <label>始点:</label>
+      <select id="start">
+        <option value="0">富山市ガラス美術館</option>
+        <option value="1">国宝高岡山瑞龍寺</option>
+        <option value="2">富山県富岩運河環水公園</option>
+        <option value="3">越中五箇山相倉合掌集落</option>
+        <option value="4">富山県美術館</option>
+        <option value="5">日本三大佛高岡大佛</option>
+        <option value="6">国定公園雨晴海岸</option>
+        <option value="7">富山城（富山市郷土博物館）</option>
+        <option value="8">富山市役所展望塔</option>
+        <option value="9">富山市ファミリーパーク</option>
+        <option value="10">氷見漁港場外市場ひみ番屋街</option>
+        <option value="11">魚津水族館</option>
+        <option value="12">氷見市潮風ギャラリー（藤子不二雄Aアートコレクション）</option>
+        <option value="13">海王丸パーク</option>
+        <option value="14">ほたるいかミュージアム</option>
+        <option value="15">ますのすし本舗源ますのすしミュージアム</option>
+        <option value="16">新湊大橋</option>
+        <option value="17">池田屋安兵衛商店</option>
+        <option value="18">富山ガラス工房</option>
+        <option value="19">きときと市場とやマルシェGOSHU</option>
+        <option value="20">北前船回船問屋森家</option>
+        <option value="21">チューリップ四季彩館</option>
+        <option value="22">井波別院瑞泉寺</option>
+        <option value="23">富山山王さん日枝神社</option>
+        <option value="24">富山市科学博物館</option>
+        <option value="25">富山縣護國神社</option>
+        <option value="26">菅沼合掌造り集落</option>
+        <option value="27">満天の湯富山店</option>
+        <option value="28">高岡おとぎの森公園</option>
+        <option value="29">散居村展望台展望広場</option>
+        <option value="30">富山県中央植物園</option>
+        <option value="31">秋水美術館</option>
+        <option value="32">日本の名湯金太郎温泉日帰り温泉カルナの館</option>
+        <option value="33">諏訪町本通り（富山市八尾町）</option>
+        <option value="34">富山県立山カルデラ砂防博物館</option>
+        <option value="35">富山市郷土博物館</option>
+        <option value="36">富山港展望台</option>
+        <option value="37">高岡古城公園動物園</option>
+        <option value="38">富山市民俗民芸村</option>
+        <option value="39">富山市佐藤記念美術館</option>
+        <option value="40">高岡市万葉歴史館</option>
+        <option value="41">ミラージュランド</option>
+        <option value="42">県民公園太閤山ランド</option>
+        <option value="43">岩瀬の古い町並み</option>
+        <option value="44">富山県水墨美術館</option>
+        <option value="45">営農ワイエムアイ</option>
+        <option value="46">桂樹舎・和紙文庫</option>
+        <option value="47">海の駅蜃気楼</option>
+        <option value="48">真言密教大本山大岩山日石寺</option>
+        <option value="49">雲龍山勝興寺</option>
+        <option value="50">高志の国文学館</option>
+        <option value="51">特別天然記念物魚津埋没林博物館</option>
+        <option value="52">射水市大島絵本館</option>
+        <option value="53">富山県立イタイイタイ病資料館</option>
+        <option value="54">氷見あいやまガーデン</option>
+        <option value="55">牛岳温泉スキー場</option>
+        <option value="56">梅かまミュージアムU-mei館</option>
+        <option value="57">ミュゼふくおかカメラ館</option>
+        <option value="58">呉羽山公園展望台</option>
+        <option value="59">高岡御車山会館</option>
+        <option value="60">氷見市海浜植物園シーサイドパーク</option>
+        <option value="61">高岡古城公園（高岡城跡）</option>
+        <option value="62">まんがロード（氷見市）</option>
+        <option value="63">黒部川電気記念館</option>
+        <option value="64">高岡市美術館</option>
+        <option value="65">二上山公園(城山園地）</option>
+      </select>
+      <br><br>
+      
+      <label>終点:</label>
+      <select id="end">
+        <option value="0">富山市ガラス美術館</option>
+        <option value="1">国宝高岡山瑞龍寺</option>
+        <option value="2">富山県富岩運河環水公園</option>
+        <option value="3">越中五箇山相倉合掌集落</option>
+        <option value="4">富山県美術館</option>
+        <option value="5">日本三大佛高岡大佛</option>
+        <option value="6">国定公園雨晴海岸</option>
+        <option value="7">富山城（富山市郷土博物館）</option>
+        <option value="8">富山市役所展望塔</option>
+        <option value="9">富山市ファミリーパーク</option>
+        <option value="10">氷見漁港場外市場ひみ番屋街</option>
+        <option value="11">魚津水族館</option>
+        <option value="12">氷見市潮風ギャラリー（藤子不二雄Aアートコレクション）</option>
+        <option value="13">海王丸パーク</option>
+        <option value="14">ほたるいかミュージアム</option>
+        <option value="15">ますのすし本舗源ますのすしミュージアム</option>
+        <option value="16">新湊大橋</option>
+        <option value="17">池田屋安兵衛商店</option>
+        <option value="18">富山ガラス工房</option>
+        <option value="19">きときと市場とやマルシェGOSHU</option>
+        <option value="20">北前船回船問屋森家</option>
+        <option value="21">チューリップ四季彩館</option>
+        <option value="22">井波別院瑞泉寺</option>
+        <option value="23">富山山王さん日枝神社</option>
+        <option value="24">富山市科学博物館</option>
+        <option value="25">富山縣護國神社</option>
+        <option value="26">菅沼合掌造り集落</option>
+        <option value="27">満天の湯富山店</option>
+        <option value="28">高岡おとぎの森公園</option>
+        <option value="29">散居村展望台展望広場</option>
+        <option value="30">富山県中央植物園</option>
+        <option value="31">秋水美術館</option>
+        <option value="32">日本の名湯金太郎温泉日帰り温泉カルナの館</option>
+        <option value="33">諏訪町本通り（富山市八尾町）</option>
+        <option value="34">富山県立山カルデラ砂防博物館</option>
+        <option value="35">富山市郷土博物館</option>
+        <option value="36">富山港展望台</option>
+        <option value="37">高岡古城公園動物園</option>
+        <option value="38">富山市民俗民芸村</option>
+        <option value="39">富山市佐藤記念美術館</option>
+        <option value="40">高岡市万葉歴史館</option>
+        <option value="41">ミラージュランド</option>
+        <option value="42">県民公園太閤山ランド</option>
+        <option value="43">岩瀬の古い町並み</option>
+        <option value="44">富山県水墨美術館</option>
+        <option value="45">営農ワイエムアイ</option>
+        <option value="46">桂樹舎・和紙文庫</option>
+        <option value="47">海の駅蜃気楼</option>
+        <option value="48">真言密教大本山大岩山日石寺</option>
+        <option value="49">雲龍山勝興寺</option>
+        <option value="50">高志の国文学館</option>
+        <option value="51">特別天然記念物魚津埋没林博物館</option>
+        <option value="52">射水市大島絵本館</option>
+        <option value="53">富山県立イタイイタイ病資料館</option>
+        <option value="54">氷見あいやまガーデン</option>
+        <option value="55">牛岳温泉スキー場</option>
+        <option value="56">梅かまミュージアムU-mei館</option>
+        <option value="57">ミュゼふくおかカメラ館</option>
+        <option value="58">呉羽山公園展望台</option>
+        <option value="59">高岡御車山会館</option>
+        <option value="60">氷見市海浜植物園シーサイドパーク</option>
+        <option value="61">高岡古城公園（高岡城跡）</option>
+        <option value="62">まんがロード（氷見市）</option>
+        <option value="63">黒部川電気記念館</option>
+        <option value="64">高岡市美術館</option>
+        <option value="65">二上山公園(城山園地）</option>
+      </select>
+      <br><br>
+      
+      <label>出発時刻　　：</label>
+      <input type="time" id="startTime" value="09:00">
+      <br><br>
+      <label>目標到着時刻：</label>
+      <input type="time" id="endTime" value="20:00">
+      <br><br>
+      
+      <label>自然　　　：</label>
+      <select id="pref0">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br><br>
+      
+      <label>景観　　　：</label>
+      <select id="pref1">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br><br>
+      
+      <label>歴史　　　：</label>
+      <select id="pref2">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br><br>
+      
+      <label>文化・伝統：</label>
+      <select id="pref3">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br><br>
+      
+      <label>芸術　　　：</label>
+      <select id="pref4">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br><br>
+      
+      <label>食　　　　：</label>
+      <select id="pref5">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br><br>
+      
+      <label>買い物　　：</label>
+      <select id="pref6">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br><br>
+      
+      <label>体験　　　：</label>
+      <select id="pref7">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br><br>
+      
+      <label>レジャー　：</label>
+      <select id="pref8">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br><br>
+      
+      <label>癒し　　　：</label>
+      <select id="pref9">
+        <option value="-1" selected>選択</option>
+        <option value="0">0（興味ない）</option>
+        <option value="1">1（少し興味）</option>
+        <option value="2">2（興味あり）</option>
+        <option value="3">3（とても興味）</option>
+      </select>
+      <br>
+      
+    
+      <button id="saveBtn" style="
+        margin-top: 30px;
+        padding: 8px 14px;
+        font-size: 17px;
+        border-radius: 8px;
+        cursor: pointer;
+      ">保存</button>
+      
     </div>
   </div>
+<script>
+  /* =========================================================
+     定数定義
+  ========================================================= */
+  
+  //入力
+  const locations = [
+  {    name: "富山市ガラス美術館",    address: "富山市西町5番1号",    lat: 36.6884,    lng: 137.215,    rev_val: 4.2,    rev_num: 6126,    open_time: 570,    close_time: 1080,    req_time: 90,    view_pt: [0, 3, 1, 2, 3, 1, 2, 2, 2, 2]  },
+  {    name: "国宝高岡山瑞龍寺",    address: "高岡市関本町３５",    lat: 36.7356,    lng: 137.011,    rev_val: 4.4,    rev_num: 3421,    open_time: 540,    close_time: 990,    req_time: 60,    view_pt: [1, 3, 3, 2, 1, 0, 1, 1, 0, 1]  },
+  {    name: "富山県富岩運河環水公園",    address: "富山市湊入船町1",    lat: 36.7094,    lng: 137.212,    rev_val: 4.4,    rev_num: 7775,    open_time: 0,    close_time: 1440,    req_time: 45,    view_pt: [2, 3, 0, 2, 1, 0, 0, 2, 2, 2]  },
+  {    name: "越中五箇山相倉合掌集落",    address: "南砺市相倉611",    lat: 36.426,    lng: 136.935,    rev_val: 4.3,    rev_num: 3395,    open_time: 510,    close_time: 1020,    req_time: 90,    view_pt: [3, 3, 1, 3, 1, 2, 2, 1, 1, 2]  },
+  {    name: "富山県美術館",    address: "富山市木場町3-20",    lat: 36.7106,    lng: 137.21,    rev_val: 4.2,    rev_num: 3015,    open_time: 570,    close_time: 1080,    req_time: 90,    view_pt: [2, 3, 1, 1, 3, 2, 2, 2, 2, 3]  },
+  {    name: "日本三大佛高岡大佛",    address: "高岡市大手町11-29",    lat: 36.7456,    lng: 137.017,    rev_val: 4.1,    rev_num: 727,    open_time: 540,    close_time: 1020,    req_time: 60,    view_pt: [1, 2, 3, 3, 2, 0, 0, 1, 1, 2]  },
+  {    name: "国定公園雨晴海岸",    address: "高岡市太田雨晴",    lat: 36.8149,    lng: 137.042,    rev_val: 4.4,    rev_num: 2036,    open_time: 0,    close_time: 1440,    req_time: 60,    view_pt: [3, 3, 0, 0, 2, 1, 1, 2, 2, 3]  },
+  {    name: "富山城（富山市郷土博物館）",    address: "富山市本丸1-45",    lat: 36.6927,    lng: 137.212,    rev_val: 3.9,    rev_num: 611,    open_time: 540,    close_time: 1020,    req_time: 45,    view_pt: [2, 3, 3, 2, 3, 1, 1, 1, 1, 2]  },
+  {    name: "富山市役所展望塔",    address: "富山市新桜町7番38号",    lat: 36.6958,    lng: 137.214,    rev_val: 4.3,    rev_num: 773,    open_time: 540,    close_time: 1080,    req_time: 30,    view_pt: [1, 3, 1, 0, 0, 0, 0, 1, 1, 1]  },
+  {    name: "富山市ファミリーパーク",    address: "富山市古沢254番地",    lat: 36.6923,    lng: 137.149,    rev_val: 4.2,    rev_num: 1401,    open_time: 600,    close_time: 930,    req_time: 180,    view_pt: [3, 0, 0, 0, 1, 1, 1, 2, 3, 3]  },
+  {    name: "氷見漁港場外市場ひみ番屋街",    address: "氷見市北大町25-5",    lat: 36.8644,    lng: 136.987,    rev_val: 3.9,    rev_num: 6959,    open_time: 510,    close_time: 1200,    req_time: 90,    view_pt: [1, 2, 1, 2, 1, 3, 3, 1, 2, 2]  },
+  {    name: "魚津水族館",    address: "魚津市三ケ1390",    lat: 36.7984,    lng: 137.388,    rev_val: 4.1,    rev_num: 1977,    open_time: 540,    close_time: 1020,    req_time: 90,    view_pt: [1, 1, 0, 1, 2, 0, 1, 3, 3, 3]  },
+  {    name: "氷見市潮風ギャラリー（藤子不二雄Aアートコレクション）",    address: "氷見市中央町3-4",    lat: 36.8591,    lng: 136.987,    rev_val: 4,    rev_num: 652,    open_time: 0,    close_time: 1440,    req_time: 30,    view_pt: [1, 2, 1, 3, 3, 0, 1, 1, 2, 1]  },
+  {    name: "海王丸パーク",    address: "射水市海王町8番地",    lat: 36.7802,    lng: 137.11,    rev_val: 4.4,    rev_num: 65,    open_time: 570,    close_time: 1020,    req_time: 60,    view_pt: [3, 3, 1, 2, 1, 2, 2, 2, 3, 2]  },
+  {    name: "ほたるいかミュージアム",    address: "滑川市中川原410",    lat: 36.7741,    lng: 137.344,    rev_val: 3.7,    rev_num: 2639,    open_time: 540,    close_time: 1020,    req_time: 60,    view_pt: [2, 2, 2, 3, 1, 0, 1, 2, 2, 2]  },
+  {    name: "ますのすし本舗源ますのすしミュージアム",    address: "富山市南央町37-6",    lat: 36.6277,    lng: 137.205,    rev_val: 3.8,    rev_num: 1554,    open_time: 540,    close_time: 1020,    req_time: 180,    view_pt: [0, 1, 0, 2, 2, 3, 3, 3, 2, 1]  },
+  {    name: "新湊大橋",    address: "射水市海王町～海竜町",    lat: 36.7759,    lng: 137.115,    rev_val: 4.4,    rev_num: 386,    open_time: 360,    close_time: 1200,    req_time: 60,    view_pt: [2, 3, 1, 0, 1, 0, 0, 2, 2, 2]  },
+  {    name: "池田屋安兵衛商店",    address: "富山市堤町通り1-3-5",    lat: 36.6885,    lng: 137.218,    rev_val: 4.2,    rev_num: 100,    open_time: 540,    close_time: 1080,    req_time: 20,    view_pt: [0, 2, 2, 2, 1, 2, 2, 2, 1, 2]  },
+  {    name: "富山ガラス工房",    address: "富山市古沢152",    lat: 36.6953,    lng: 137.146,    rev_val: 4.1,    rev_num: 342,    open_time: 540,    close_time: 1020,    req_time: 30,    view_pt: [1, 1, 0, 2, 3, 0, 2, 3, 3, 2]  },
+  {    name: "きときと市場とやマルシェGOSHU",    address: "富山市明輪町1-220",    lat: 36.701,    lng: 137.214,    rev_val: 4.1,    rev_num: 17,    open_time: 540,    close_time: 1230,    req_time: 20,    view_pt: [0, 1, 0, 1, 1, 3, 3, 0, 0, 0]  },
+  {    name: "北前船回船問屋森家",    address: "富山市東岩瀬町108",    lat: 36.7568,    lng: 137.229,    rev_val: 3.9,    rev_num: 520,    open_time: 540,    close_time: 1020,    req_time: 30,    view_pt: [1, 2, 3, 3, 2, 0, 1, 2, 1, 2]  },
+  {    name: "チューリップ四季彩館",    address: "砺波市中村100番地1",    lat: 36.6411,    lng: 136.965,    rev_val: 4.2,    rev_num: 325,    open_time: 540,    close_time: 1080,    req_time: 60,    view_pt: [2, 3, 0, 2, 2, 1, 2, 2, 2, 3]  },
+  {    name: "井波別院瑞泉寺",    address: "南砺市井波305",    lat: 36.5588,    lng: 136.972,    rev_val: 4.3,    rev_num: 724,    open_time: 540,    close_time: 990,    req_time: 30,    view_pt: [2, 3, 3, 2, 2, 0, 1, 2, 1, 3]  },
+  {    name: "富山山王さん日枝神社",    address: "富山市山王町4-12",    lat: 36.6866,    lng: 137.214,    rev_val: 4.1,    rev_num: 1001,    open_time: 510,    close_time: 1020,    req_time: 20,    view_pt: [0, 2, 2, 3, 1, 0, 1, 2, 1, 1]  },
+  {    name: "富山市科学博物館",    address: "富山市西中野町一丁目8番31号",    lat: 36.6809,    lng: 137.212,    rev_val: 4.2,    rev_num: 791,    open_time: 540,    close_time: 1020,    req_time: 60,    view_pt: [1, 2, 3, 2, 2, 0, 1, 2, 1, 2]  },
+  {    name: "富山縣護國神社",    address: "富山市磯部町1-1",    lat: 36.6898,    lng: 137.202,    rev_val: 4.3,    rev_num: 838,    open_time: 510,    close_time: 1020,    req_time: 30,    view_pt: [1, 3, 3, 2, 1, 0, 1, 2, 1, 3]  },
+  {    name: "菅沼合掌造り集落",    address: "南砺市菅沼578",    lat: 36.4042,    lng: 136.886,    rev_val: 4.2,    rev_num: 3472,    open_time: 540,    close_time: 1020,    req_time: 45,    view_pt: [3, 3, 1, 2, 2, 2, 2, 2, 2, 3]  },
+  {    name: "満天の湯富山店",    address: "富山市石金2丁目1-8",    lat: 36.6871,    lng: 137.233,    rev_val: 4.1,    rev_num: 1842,    open_time: 480,    close_time: 1440,    req_time: 60,    view_pt: [1, 1, 0, 1, 0, 1, 1, 3, 3, 3]  },
+  {    name: "高岡おとぎの森公園",    address: "高岡市佐野1342",    lat: 36.7251,    lng: 137,    rev_val: 4.2,    rev_num: 74,    open_time: 540,    close_time: 1020,    req_time: 60,    view_pt: [2, 3, 0, 1, 2, 1, 0, 2, 3, 2]  },
+  {    name: "散居村展望台展望広場",    address: "砺波市五谷160",    lat: 36.587,    lng: 137.013,    rev_val: 4.1,    rev_num: 309,    open_time: 0,    close_time: 1440,    req_time: 15,    view_pt: [3, 3, 0, 2, 1, 0, 0, 2, 1, 2]  },
+  {    name: "富山県中央植物園",    address: "富山市婦中町上轡田42",    lat: 36.6625,    lng: 137.181,    rev_val: 4.2,    rev_num: 477,    open_time: 540,    close_time: 990,    req_time: 60,    view_pt: [3, 2, 1, 1, 2, 1, 1, 1, 2, 2]  },
+  {    name: "秋水美術館",    address: "富山市千石町1-3-6",    lat: 36.6874,    lng: 137.212,    rev_val: 4.2,    rev_num: 262,    open_time: 600,    close_time: 1020,    req_time: 45,    view_pt: [0, 1, 3, 3, 3, 0, 1, 1, 1, 1]  },
+  {    name: "日本の名湯金太郎温泉日帰り温泉カルナの館",    address: "魚津市天神野新6000",    lat: 36.8395,    lng: 137.437,    rev_val: 4.1,    rev_num: 648,    open_time: 510,    close_time: 1410,    req_time: 60,    view_pt: [2, 2, 0, 1, 1, 1, 2, 3, 2, 3]  },
+  {    name: "諏訪町本通り（富山市八尾町）",    address: "富山市八尾町諏訪町",    lat: 36.5757,    lng: 137.133,    rev_val: 4.2,    rev_num: 267,    open_time: 0,    close_time: 1440,    req_time: 20,    view_pt: [1, 2, 1, 3, 2, 1, 1, 1, 1, 1]  },
+  {    name: "富山県立山カルデラ砂防博物館",    address: "中新川郡立山町芦峅寺字ブナ坂68",    lat: 36.5822,    lng: 137.446,    rev_val: 4.3,    rev_num: 398,    open_time: 570,    close_time: 1020,    req_time: 90,    view_pt: [3, 3, 2, 2, 2, 0, 0, 2, 2, 2]  },
+  {    name: "富山市郷土博物館",    address: "富山市本丸1-62",    lat: 36.6928,    lng: 137.211,    rev_val: 3.8,    rev_num: 1614,    open_time: 540,    close_time: 1020,    req_time: 30,    view_pt: [2, 2, 2, 3, 2, 0, 0, 1, 1, 1]  },
+  {    name: "富山港展望台",    address: "富山市東岩瀬町海岸通り5",    lat: 36.7581,    lng: 137.228,    rev_val: 3.7,    rev_num: 722,    open_time: 540,    close_time: 990,    req_time: 15,    view_pt: [1, 3, 1, 1, 1, 0, 0, 1, 1, 2]  },
+  {    name: "高岡古城公園動物園",    address: "高岡市古城1-6",    lat: 36.7478,    lng: 137.023,    rev_val: 4.2,    rev_num: 284,    open_time: 540,    close_time: 990,    req_time: 30,    view_pt: [2, 1, 0, 0, 0, 0, 0, 2, 1, 2]  },
+  {    name: "富山市民俗民芸村",    address: "富山市安養坊56-1",    lat: 36.7087,    lng: 137.189,    rev_val: 4,    rev_num: 94,    open_time: 540,    close_time: 1020,    req_time: 80,    view_pt: [2, 2, 2, 3, 2, 0, 0, 1, 1, 1]  },
+  {    name: "富山市佐藤記念美術館",    address: "富山市本丸1-62",    lat: 36.6939,    lng: 137.212,    rev_val: 3.9,    rev_num: 71,    open_time: 540,    close_time: 1020,    req_time: 30,    view_pt: [1, 2, 3, 3, 3, 0, 1, 2, 1, 2]  },
+  {    name: "高岡市万葉歴史館",    address: "高岡市伏木一宮1-11-11",    lat: 36.7956,    lng: 137.046,    rev_val: 4,    rev_num: 263,    open_time: 540,    close_time: 1020,    req_time: 90,    view_pt: [3, 2, 3, 3, 2, 1, 0, 1, 1, 2]  },
+  {    name: "ミラージュランド",    address: "魚津市三ヶ1181-1",    lat: 36.8002,    lng: 137.386,    rev_val: 3.9,    rev_num: 876,    open_time: 600,    close_time: 990,    req_time: 90,    view_pt: [2, 2, 0, 0, 0, 1, 1, 3, 3, 2]  },
+  {    name: "県民公園太閤山ランド",    address: "射水市黒河4774-6",    lat: 36.6914,    lng: 137.106,    rev_val: 4.1,    rev_num: 637,    open_time: 540,    close_time: 1020,    req_time: 90,    view_pt: [3, 2, 0, 0, 2, 1, 0, 3, 3, 2]  },
+  {    name: "岩瀬の古い町並み",    address: "富山市東岩瀬町",    lat: 36.7565,    lng: 137.229,    rev_val: 4.2,    rev_num: 18,    open_time: 0,    close_time: 1440,    req_time: 120,    view_pt: [2, 3, 2, 3, 1, 3, 2, 2, 1, 2]  },
+  {    name: "富山県水墨美術館",    address: "富山市五福777",    lat: 36.6991,    lng: 137.197,    rev_val: 4.1,    rev_num: 750,    open_time: 570,    close_time: 1080,    req_time: 60,    view_pt: [1, 3, 2, 2, 3, 0, 1, 2, 1, 2]  },
+  {    name: "営農ワイエムアイ",    address: "富山市中番13番地",    lat: 36.6202,    lng: 137.294,    rev_val: 3.9,    rev_num: 18,    open_time: 480,    close_time: 900,    req_time: 45,    view_pt: [0, 0, 0, 0, 1, 3, 3, 1, 1, 2]  },
+  {    name: "桂樹舎・和紙文庫",    address: "富山市八尾町鏡町668-4",    lat: 36.5787,    lng: 137.131,    rev_val: 4.1,    rev_num: 93,    open_time: 600,    close_time: 1020,    req_time: 30,    view_pt: [1, 2, 1, 3, 3, 1, 3, 2, 2, 2]  },
+  {    name: "海の駅蜃気楼",    address: "魚津市村木定坊割2500-2",    lat: 36.8249,    lng: 137.394,    rev_val: 3.7,    rev_num: 1653,    open_time: 540,    close_time: 1080,    req_time: 60,    view_pt: [3, 2, 0, 2, 0, 3, 3, 2, 2, 2]  },
+  {    name: "真言密教大本山大岩山日石寺",    address: "中新川郡上市町大岩163",    lat: 36.6622,    lng: 137.391,    rev_val: 4.3,    rev_num: 1023,    open_time: 540,    close_time: 960,    req_time: 60,    view_pt: [3, 3, 3, 2, 1, 2, 1, 2, 1, 3]  },
+  {    name: "雲龍山勝興寺",    address: "高岡市伏木古国府17番１号",    lat: 36.7926,    lng: 137.052,    rev_val: 4.2,    rev_num: 661,    open_time: 540,    close_time: 960,    req_time: 60,    view_pt: [1, 3, 3, 2, 3, 0, 1, 2, 0, 2]  },
+  {    name: "高志の国文学館",    address: "富山市舟橋南町２番２２号",    lat: 36.6955,    lng: 137.206,    rev_val: 4.1,    rev_num: 355,    open_time: 570,    close_time: 1080,    req_time: 60,    view_pt: [1, 3, 3, 2, 3, 1, 1, 1, 1, 2]  },
+  {    name: "特別天然記念物魚津埋没林博物館",    address: "魚津市釈迦堂814",    lat: 36.8225,    lng: 137.395,    rev_val: 3.9,    rev_num: 1013,    open_time: 540,    close_time: 1020,    req_time: 60,    view_pt: [2, 3, 2, 2, 0, 0, 1, 2, 2, 2]  },
+  {    name: "射水市大島絵本館",    address: "射水市鳥取50",    lat: 36.7342,    lng: 137.074,    rev_val: 4.1,    rev_num: 196,    open_time: 570,    close_time: 1050,    req_time: 60,    view_pt: [1, 2, 0, 2, 3, 0, 0, 2, 1, 2]  },
+  {    name: "富山県立イタイイタイ病資料館",    address: "富山市友杉151（とやま健康パーク内）",    lat: 36.6362,    lng: 137.202,    rev_val: 4.3,    rev_num: 170,    open_time: 540,    close_time: 1020,    req_time: 60,    view_pt: [0, 1, 3, 2, 0, 0, 0, 0, 1, 1]  },
+  {    name: "氷見あいやまガーデン",    address: "氷見市稲積112番1",    lat: 36.8889,    lng: 136.964,    rev_val: 3.9,    rev_num: 182,    open_time: 540,    close_time: 1020,    req_time: 120,    view_pt: [3, 2, 0, 0, 2, 1, 1, 2, 3, 3]  },
+  {    name: "牛岳温泉スキー場",    address: "山田小谷山田中根",    lat: 36.5725,    lng: 137.056,    rev_val: 4.1,    rev_num: 249,    open_time: 510,    close_time: 990,    req_time: 120,    view_pt: [3, 2, 0, 0, 0, 1, 0, 3, 3, 2]  },
+  {    name: "梅かまミュージアムU-mei館",    address: "富山市水橋肘崎482-8(カイナザキ)",    lat: 36.7312,    lng: 137.291,    rev_val: 3.5,    rev_num: 40,    open_time: 600,    close_time: 960,    req_time: 60,    view_pt: [0, 0, 1, 3, 2, 3, 2, 3, 2, 2]  },
+  {    name: "ミュゼふくおかカメラ館",    address: "高岡市福岡町福岡新559番地",    lat: 36.7115,    lng: 136.93,    rev_val: 4.1,    rev_num: 317,    open_time: 540,    close_time: 1020,    req_time: 60,    view_pt: [0, 2, 1, 2, 3, 1, 1, 1, 1, 2]  },
+  {    name: "呉羽山公園展望台",    address: "富山市安養坊",    lat: 36.7089,    lng: 137.185,    rev_val: 4.1,    rev_num: 34,    open_time: 0,    close_time: 1440,    req_time: 30,    view_pt: [3, 2, 1, 0, 2, 0, 0, 1, 2, 2]  },
+  {    name: "高岡御車山会館",    address: "高岡市守山町47-1",    lat: 36.7467,    lng: 137.01,    rev_val: 4,    rev_num: 334,    open_time: 540,    close_time: 1020,    req_time: 60,    view_pt: [1, 2, 1, 3, 3, 1, 1, 1, 1, 2]  },
+  {    name: "氷見市海浜植物園シーサイドパーク",    address: "氷見市柳田3583",    lat: 36.8373,    lng: 137.005,    rev_val: 3.8,    rev_num: 569,    open_time: 540,    close_time: 1020,    req_time: 90,    view_pt: [3, 2, 0, 0, 1, 1, 1, 2, 2, 3]  },
+  {    name: "高岡古城公園（高岡城跡）",    address: "高岡市古城1-1",    lat: 36.7493,    lng: 137.021,    rev_val: 3.9,    rev_num: 565,    open_time: 480,    close_time: 1020,    req_time: 30,    view_pt: [2, 2, 3, 1, 1, 0, 0, 1, 1, 2]  },
+  {    name: "まんがロード（氷見市）",    address: "氷見市伊勢大町～北大町",    lat: 36.8597,    lng: 136.987,    rev_val: 3.8,    rev_num: 267,    open_time: 0,    close_time: 1440,    req_time: 90,    view_pt: [1, 1, 1, 3, 3, 0, 0, 1, 2, 1]  },
+  {    name: "黒部川電気記念館",    address: "黒部市黒部峡谷口11",    lat: 36.8149,    lng: 137.586,    rev_val: 3.8,    rev_num: 124,    open_time: 540,    close_time: 960,    req_time: 30,    view_pt: [2, 2, 1, 2, 1, 0, 0, 1, 1, 1]  },
+  {    name: "高岡市美術館",    address: "高岡市中川1-1-30",    lat: 36.7512,    lng: 137.027,    rev_val: 3.9,    rev_num: 763,    open_time: 570,    close_time: 1020,    req_time: 60,    view_pt: [2, 2, 3, 3, 3, 0, 1, 1, 1, 2]  },
+  {    name: "二上山公園(城山園地）",    address: "高岡市東海老坂字馬鞍2056",    lat: 36.79,    lng: 137.015,    rev_val: 4,    rev_num: 41,    open_time: 0,    close_time: 1440,    req_time: 45,    view_pt: [3, 3, 2, 1, 1, 0, 0, 1, 2, 2]  }
+  ];
+  
+  
+  /* =========================================================
+     グローバル状態（ユーザー入力・計算結果）
+  ========================================================= */
+  
+  function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); } // [a,b] の整数
+  const CONST_REVIEW_NUM = 384.0;
+  
+  // 現在表示中のルート
+  let currentRouteOrder = [];
+  
+  const P = {
+    N: locations.length,
+    start_vertex: 19, // 例: locations[0]をスタート
+    goal_vertex: 19, // 例: 最後をゴール
+    start_time: 540.0, // 例: 9:00
+    goal_time: 1200.0, // 例: 20:00
+    prefers: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1], // ユーザー嗜好
+    review_val: locations.map(l => l.rev_val),
+    review_num: locations.map(l => l.rev_num),
+    open_time: locations.map(l => [l.open_time, l.close_time]),
+    required_time: locations.map(l => l.req_time),
+    view_points: locations.map(l => l.view_pt),
+    pos_lats: locations.map(l => l.lat),
+    pos_lngs: locations.map(l => l.lng),
+    pos_names: locations.map(l => [l.name, l.address]),
+    cost: Array.from({ length: locations.length }, () => Array(locations.length).fill(0)),
+    address: locations.map(l => l.address),
+  };
+  
+  
+  /* =========================================================
+     マップ初期化 / ルートデータ読み込み
+  ========================================================= */
+  
+  const MAPTILER_KEY = "oOItToAZ0tFojV2nJjns";
 
-  <script>
-    const MAPTILER_KEY = 'oOItToAZ0tFojV2nJjns';
-
-    const map = new maplibregl.Map({
-      container: 'map',
-      style: `https://api.maptiler.com/maps/streets-v4/style.json?key=${MAPTILER_KEY}`,
-      center: [137.2137, 36.6952],
-      zoom: 12
-    });
-    map.setMinZoom(9);
-    map.setMaxZoom(15);
-
-    const locationData = [
-      { name: "Point A", lat: 36.6950, lng: 137.2116, rev_val: 4.2, rev_num: 6126, req_time: 90 },
-      { name: "Point B", lat: 36.6896, lng: 137.2152, rev_val: 4.0, rev_num: 3000, req_time: 50 },
-      { name: "Point C", lat: 36.6870, lng: 137.2190, rev_val: 3.8, rev_num: 2000, req_time: 40 },
-      { name: "Point D", lat: 36.6875, lng: 137.2260, rev_val: 4.4, rev_num: 1000, req_time: 30 },
-      { name: "Point E", lat: 36.6890, lng: 137.2350, rev_val: 4.1, rev_num: 500, req_time: 20 }
-    ];
-
-    const order = [0,1,2,3,4];
-    const colors = ["#e74c3c", "#3498db", "#f1c40f", "#2ecc71", "#9b59b6"];
-    let markers = [];
-
-    map.on('load', () => {
-      // ピン表示
-      order.forEach((locIdx, step) => {
-        const loc = locationData[locIdx];
-        if (!loc) return;
-        const color = colors[step % colors.length];
-        const position = [loc.lng, loc.lat];
-
-        const markerEl = document.createElement("div");
-        markerEl.style.width = "18px";
-        markerEl.style.height = "18px";
-        markerEl.style.borderRadius = "50%";
-        markerEl.style.backgroundColor = color;
-        markerEl.style.border = "2px solid white";
-        markerEl.style.color = "white";
-        markerEl.style.fontSize = "14px";
-        markerEl.style.fontWeight = "bold";
-        markerEl.style.display = "flex";
-        markerEl.style.justifyContent = "center";
-        markerEl.style.alignItems = "center";
-        markerEl.style.cursor = "pointer";
-        markerEl.innerText = step + 1;
-
-        const marker = new maplibregl.Marker({ element: markerEl }).setLngLat(position).addTo(map);
-        const popupHtml = `<div style=\"font-size:14px;\"><b>${step+1}. ${loc.name}</b><br>評価: ${loc.rev_val} (${loc.rev_num}件)<br>所要時間: 約${loc.req_time}分</div>`;
-        const popup = new maplibregl.Popup({ offset: 10 }).setHTML(popupHtml);
-        marker.getElement().addEventListener("click", () => { popup.setLngLat(position).addTo(map); });
-        markers.push(marker);
-      });
-
-      // ルート表示（各区間の始点ピン色で）
-      for (let i = 0; i < order.length - 1; i++) {
-        const startIdx = order[i];
-        const endIdx = order[i+1];
-        const coords = [[locationData[startIdx].lng, locationData[startIdx].lat], [locationData[endIdx].lng, locationData[endIdx].lat]];
-        const color = colors[i % colors.length];
-
-        map.addSource('route' + i, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } });
-        map.addLayer({
-          id: 'route' + i + '-line',
-          type: 'line',
-          source: 'route' + i,
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': color, 'line-width': 3 }
-        });
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: `https://api.maptiler.com/maps/streets-v4/style.json?key=${MAPTILER_KEY}`,
+    center: [137.2137, 36.6952],
+    zoom: 9,
+    maxZoom: 18,
+    minZoom: 5,
+  });
+  
+  const ROUTE_JSON_URL = "https://raw.githubusercontent.com/Romilli/Romilli.github.io/main/all_routes_polyline.json";
+  
+  let routeData = {};
+  
+  async function loadRouteData() {
+    try {
+      const r = await fetch(ROUTE_JSON_URL);
+      const json = await r.json();
+      for (const key in json) {
+        const raw = json[key];
+        const decodedLatLon = polylineDecode(raw.polyline);
+        const decodedLonLat = decodedLatLon.map(p => [p[1], p[0]]);
+        routeData[key] = { duration: raw.duration, polyline: decodedLonLat };
+        
+        const [from, to] = key.split("_").map(Number);
+        P.cost[from][to] = raw.duration/60;
+        
       }
-
-      // 全体を画面に収める
-      document.getElementById('fit').addEventListener('click', () => {
-        const bounds = order.reduce((b, idx) => b.extend([locationData[idx].lng, locationData[idx].lat]), new maplibregl.LngLatBounds([locationData[order[0]].lng, locationData[order[0]].lat], [locationData[order[0]].lng, locationData[order[0]].lat]));
-        map.fitBounds(bounds, { padding: 40 });
-      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  loadRouteData();
+  
+  
+  function polylineDecode(str) {
+    let index = 0;
+    let lat = 0;
+    let lng = 0;
+    const coordinates = [];
+  
+    while (index < str.length) {
+      let b, shift = 0, result = 0;
+  
+      // latitude
+      do {
+        b = str.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+      lat += dlat;
+  
+      // longitude
+      shift = 0;
+      result = 0;
+      do {
+        b = str.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+      lng += dlng;
+  
+      // precision = 1e6
+      coordinates.push([lng / 1e6, lat / 1e6]);
+    }
+    return coordinates;
+  }
+  
+  window.addEventListener("load", () => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "instant" // ← iOS対策（smoothは使わない）
     });
-  </script>
+  });
+  
+  
+  /* =========================================================
+     ルート描画関連
+  ========================================================= */
+  const colors = [
+    "#e74c3c", 
+    "#3498db", 
+    "#4ADBDB", 
+    "#32CD32", 
+    "#005756", 
+    "#9b59b6", 
+    "#FC6C85", 
+    "#FFA103", 
+    "#8e5a2b",  
+    "#34495e", 
+  ];
+
+  let markers = [];
+
+  function clearMarkers() {
+    markers.forEach(m => m.remove());
+    markers = [];
+  }
+  
+  //ルート描画レイヤー削除
+  function clearRouteLayers() {
+      const layers = map.getStyle().layers;
+      layers.forEach(ly => {
+        if (ly.id.startsWith("route")) {
+          if (map.getLayer(ly.id)) map.removeLayer(ly.id);
+        }
+      });
+
+      const sources = map.getStyle().sources;
+      Object.keys(sources).forEach(src => {
+        if (src.startsWith("route")) {
+          if (map.getSource(src)) map.removeSource(src);
+        }
+      });
+    }
+    
+  //地図上にルートを描画する
+  function drawRoute(order) {
+    clearRouteLayers();
+  
+    for (let i = 0; i < order.length - 1; i++) {
+      const a = order[i];
+      const b = order[i + 1];
+      const key = `${a}_${b}`;
+  
+      if (!routeData[key]) {
+        console.warn("No route polyline for", key);
+        continue;
+      }
+  
+      // ← ここが最重要！
+      const coords = routeData[key].polyline.map(c => [c[1], c[0]]);
+
+  
+      const color = colors[i % colors.length];
+      const srcId = `route${i}`;
+      const layerId = `route${i}-line`;
+
+      map.addSource(srcId, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: coords
+          }
+        }
+      });
+  
+      map.addLayer({
+        id: layerId,
+        type: "line",
+        source: srcId,
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": color, "line-width": 3 }
+      });
+    }
+  }
+  
+  //ピン表示
+  function drawPins(order) {
+    clearMarkers();
+  
+    order.forEach((idx, step) => {
+      const loc = locations[idx];
+      if (!loc) return;
+  
+      const color = colors[step % colors.length];
+      const position = [loc.lng, loc.lat];
+  
+      const markerEl = document.createElement("div");
+      markerEl.style.width = "20px";
+      markerEl.style.height = "20px";
+      markerEl.style.borderRadius = "50%";
+      markerEl.style.backgroundColor = color;
+      markerEl.style.border = "2px solid white";
+      markerEl.style.color = "white";
+      markerEl.style.fontSize = "15px";
+      markerEl.style.fontWeight = "bold";
+      markerEl.style.display = "flex";
+      markerEl.style.justifyContent = "center";
+      markerEl.style.alignItems = "center";
+      markerEl.style.cursor = "pointer";
+      markerEl.innerText = step + 1;
+  
+      // ★ ポップアップ（地点名のみ）
+      const popup = new maplibregl.Popup({
+        anchor: "bottom",
+        offset: 20,
+        closeButton: false,
+        closeOnClick: false
+      }).setText(loc.name);
+  
+      const marker = new maplibregl.Marker({ element: markerEl })
+        .setLngLat(position)
+        .setPopup(popup) // ← これを追加
+        .addTo(map);
+  
+      markers.push(marker);
+    });
+  }
+
+  
+  //表示範囲調整
+  function fitBounds(order) {
+      if (order.length === 0) return;
+
+      const first = locations[order[0]];
+      let bounds = new maplibregl.LngLatBounds(
+        [first.lng, first.lat],
+        [first.lng, first.lat]
+      );
+
+      order.forEach(idx => {
+        const loc = locations[idx];
+        bounds.extend([loc.lng, loc.lat]);
+      });
+
+      map.fitBounds(bounds, { padding: 40 });
+    }
+    
+  // ローディング表示・非表示
+  function showLoading() {
+    document.getElementById("loading-overlay").style.display = "flex";
+  }
+  function hideLoading() {
+    document.getElementById("loading-overlay").style.display = "none";
+  }
+  
+  /* =========================================================
+     時間割テーブル表示処理 / 計算
+  ========================================================= */
+  
+  //時間割モーダルにテーブルを挿入
+  function populateTimeTable(tableData) {
+    const tbody = document.getElementById("routeDetailsBody");
+    tbody.innerHTML = "";
+  
+    tableData.forEach(row => {
+  
+      // ↓ 移動行
+      if (row[0] === "↓") {
+        const tr = document.createElement("tr");
+  
+        const tdArrow = document.createElement("td");
+        tdArrow.textContent = "↓";
+        tr.appendChild(tdArrow);
+  
+        const tdTime = document.createElement("td");
+        tdTime.textContent = row[1];
+        tr.appendChild(tdTime);
+  
+        tr.appendChild(document.createElement("td"));
+        tr.appendChild(document.createElement("td"));
+  
+        tr.classList.add("move-row");
+        tbody.appendChild(tr);
+        return;
+      }
+  
+      // 通常行（地点名・時間）
+      const trMain = document.createElement("tr");
+      for (let i = 0; i < 4; i++) {
+        const td = document.createElement("td");
+        td.textContent = row[i]; // 住所を飛ばす
+        trMain.appendChild(td);
+      }
+      tbody.appendChild(trMain);
+  
+      // 住所行（colspan）
+      const trAddr = document.createElement("tr");
+      const tdAddr = document.createElement("td");
+      tdAddr.colSpan = 4;
+      tdAddr.textContent = "住所：" + row[4];
+      tdAddr.classList.add("address-row");
+  
+      trAddr.appendChild(tdAddr);
+      tbody.appendChild(trAddr);
+    });
+}
+  
+  function makeTimeTable(P, route) {
+  
+    const table = [];
+    let now_time = P.start_time;
+    const routeNum = route.length;
+  
+    /* =========================
+       出発地点
+    ========================= */
+    table.push([
+      P.pos_names[route[0]][0],
+      "出発",
+      "",
+      formatTime(now_time),
+      P.address[route[0]]
+    ]);
+  
+    /* =========================
+       中間地点
+    ========================= */
+    for (let i = 1; i < routeNum - 1; i++) {
+      const prev = route[i - 1];
+      const cur  = route[i];
+  
+      /* --- 移動行 --- */
+      let moveText = `${Math.floor(P.cost[prev][cur])}分`;
+      now_time += P.cost[prev][cur];
+  
+      const open_s = P.open_time[cur][0];
+      if (now_time < open_s) {
+        moveText += `(+待ち${Math.floor(open_s - now_time)}分)`;
+        now_time = open_s;
+      }
+  
+      table.push([
+        "↓",
+        moveText,
+        "",
+        ""
+      ]);
+  
+      /* --- 観光行 --- */
+      const arrive = formatTime(now_time);
+      now_time += P.required_time[cur];
+      const depart = formatTime(now_time);
+  
+      table.push([
+        P.pos_names[cur][0],
+        `${Math.floor(P.required_time[cur])}分`,
+        arrive,
+        depart,
+        P.address[cur]
+      ]);
+    }
+  
+    /* =========================
+       ゴール
+    ========================= */
+    const last = routeNum - 1;
+  
+    // 移動
+    table.push([
+      "↓",
+      `${Math.floor(P.cost[route[last - 1]][route[last]])}分`,
+      "",
+      ""
+    ]);
+  
+    now_time += P.cost[route[last - 1]][route[last]];
+  
+    // 到着
+    table.push([
+      P.pos_names[route[last]][0],
+      "到着",
+      formatTime(now_time),
+      "",
+      P.address[route[last]]
+    ]);
+  
+    return table;
+  }
+  
+  function formatTime(time) {
+    const hour = Math.floor(time / 60);
+    const minute = Math.floor(time % 60);
+    const hh = hour < 10 ? `0${hour}` : `${hour}`;
+    const mm = minute < 10 ? `0${minute}` : `${minute}`;
+    return `${hh}:${mm}`;
+}
+
+  
+  /* =========================================================
+     ------ 時間割モーダル処理 ------
+  ========================================================= */
+  
+  const timeTableModal = document.getElementById("timeTableModal");
+  const openTimeTableButton = document.getElementById("showDetailsBtn");
+  const closeTimeTableButton = timeTableModal.querySelector(".close");
+  
+  // 開く
+  openTimeTableButton.addEventListener("click", () => {
+    if(currentRouteOrder.length === 0){
+      alert('ルートを生成してください');
+      return;
+    }
+    
+    populateTimeTable(makeTimeTable(P, currentRouteOrder));
+    timeTableModal.style.display = "block";
+  });
+  
+  // 閉じる（×）
+  closeTimeTableButton.addEventListener("click", () => {
+    timeTableModal.style.display = "none";
+  });
+  // 背景クリックで閉じる
+  window.addEventListener("click", (event) => {
+    if (event.target === timeTableModal) {
+      timeTableModal.style.display = "none";
+    }
+  });
+  
+  
+  /* =========================================================
+     ------ 嗜好パラメータモーダル処理 ------
+  ========================================================= */
+  
+  const preferenceModal = document.getElementById("preferenceModal");
+  const openPreferenceButton = document.getElementById("preferenceBtn");
+  const closePreferenceButton = document.getElementById("closePrefModal");
+  const savePreferenceButton = document.getElementById("saveBtn");
+  
+  // 開く
+  openPreferenceButton.addEventListener("click", () => {
+    preferenceModal.style.display = "block";
+  });
+  
+  // 閉じる
+  closePreferenceButton.addEventListener("click", () => {
+    preferenceModal.style.display = "none";
+  });
+  
+  // 背景クリックで閉じる
+  window.addEventListener("click", (event) => {
+    if (event.target === preferenceModal) {
+      preferenceModal.style.display = "none";
+    }
+  });
+  
+  savePreferenceButton.addEventListener("click", () => {
+    
+    P.start_vertex = parseInt(document.getElementById("start").value);
+    P.goal_vertex = parseInt(document.getElementById("end").value);
+    
+    P.start_time = (() => {
+      const [h, m] = document.getElementById("startTime").value.split(":").map(Number);
+      return h * 60 + m;
+    })();
+    P.goal_time = (() => {
+      const [h, m] = document.getElementById("endTime").value.split(":").map(Number);
+      return h * 60 + m;
+    })();
+    
+    for (let i = 0; i < 10; i++) {
+      const value = parseInt(document.getElementById(`pref${i}`).value);
+      P.prefers[i] = value;
+    }
+  
+    console.log("保存された嗜好:", P.prefers);
+    preferenceModal.style.display = "none";
+  });
+  
+  
+  /* =========================================================
+     ------ ボタンイベント（全体） ------
+  ========================================================= */
+  
+  document.getElementById("showRouteBtn").addEventListener("click", async () => {
+    
+    if (P.prefers.some(v => v === -1) ) {
+      alert('入力値の全ての項目を入力してください');
+      return;
+    }
+    
+    if (P.goal_time - P.start_time < 0){
+      alert('出発時刻は目標到着時刻よりも早くしてください');
+      return;
+    }
+    if (P.goal_time - P.start_time < 120){
+      alert('出発時刻から目標到着時刻までの時間が短すぎます');
+      return;
+    }
+    
+    showLoading();
+    
+    const promiseCompute = computeRouteByPreference();
+    
+    // ★ ローディングは最低 1秒表示
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // ★ computeRoute が終わるまで待つ
+    currentRouteOrder = await promiseCompute;
+    
+    hideLoading();
+    
+    drawPins(currentRouteOrder);
+    drawRoute(currentRouteOrder);
+    fitBounds(currentRouteOrder);
+  });
+  
+  
+  /* =========================================================
+     ルート計算ロジック
+  ========================================================= */
+  
+  function evaluateRoute(P, order) {
+    const dest_num = order.length;
+  
+    let now_time = P.start_time;
+    let feasible = true;
+    let satisfaction_sum = 0.0;
+    let move_time = 0.0;
+    let waiting_time = 0.0;
+  
+    const ALPHA = 0.8;
+    const BETA = 10;
+  
+    for (let idx = 1; idx < dest_num - 1; idx++) {
+      const v = order[idx];
+      const prev = order[idx - 1];
+  
+      // 移動時間加算
+      now_time += P.cost[prev][v];
+      move_time += P.cost[prev][v];
+  
+      const open_s = P.open_time[v][0];
+      const open_e = P.open_time[v][1];
+  
+      // 営業開始前に到着 → 待機時間
+      if (now_time < open_s) {
+        waiting_time += (open_s - now_time);
+        now_time = open_s;
+      }
+  
+      // 必要滞在時間を加算
+      now_time += P.required_time[v];
+  
+      if (now_time > open_e) feasible = false;
+  
+      // === 評価値計算 ===
+      const cred = (P.review_num[v] * P.review_num[v]) /
+                   (CONST_REVIEW_NUM * CONST_REVIEW_NUM);
+  
+      // match 計算
+      let match = 0.0;
+      const r = P.prefers.map(x => x / 3.0); // 長さ10
+      for (let j = 0; j < 10; j++) {
+        const p = P.view_points[v][j] / 3.0;
+        match += Math.min(p, r[j]);
+      }
+      match /= 10.0;
+  
+      const S = P.review_val[v] *
+                Math.min(1.0, cred) *
+                Math.pow(match, 1.5);
+  
+      satisfaction_sum += S;
+    }
+  
+    const move_ratio = move_time / (P.goal_time - P.start_time);
+  
+    const arrival_goal_time = now_time + P.cost[order[dest_num - 2]][order[dest_num - 1]];
+  
+    let early_ratio = 0.0;
+  
+    if (arrival_goal_time > P.goal_time) {
+      feasible = false;
+    } else {
+      early_ratio = Math.pow(
+        (P.goal_time - arrival_goal_time + waiting_time) /
+        (P.goal_time - P.start_time),
+        2
+      );
+    }
+  
+    let raw_score = satisfaction_sum - ALPHA * move_ratio - BETA * early_ratio;
+  
+    if (!feasible) raw_score -= 1000.0;
+  
+    return {
+      score: raw_score,
+      feasible: feasible,
+      arrival_time_at_goal: arrival_goal_time
+    };
+  }
+  
+  function greedyInitial(P) {
+    const route = [P.start_vertex];
+    const used = Array(P.N).fill(false);
+    used[P.start_vertex] = true;
+    used[P.goal_vertex] = true;
+  
+    let now_time = P.start_time;
+  
+    // ランダムシャッフル用
+    const shuffleArray = arr => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    };
+  
+    // 候補地点リスト作成
+    const candidates = [];
+    for (let i = 0; i < P.N; i++) {
+      if (!used[i]) candidates.push(i);
+    }
+    shuffleArray(candidates);
+  
+    const max_visits = Math.floor(P.N / 4); // 半分だけランダム訪問
+  
+    for (let cnt = 0; cnt < max_visits && candidates.length > 0; cnt++) {
+      const v = candidates.pop();
+  
+      let arrival = now_time + P.cost[route[route.length - 1]][v];
+      if (arrival < P.open_time[v][0]) arrival = P.open_time[v][0];
+      const leave = arrival + P.required_time[v];
+  
+      if (leave > P.open_time[v][1]) continue;
+      if (leave + P.cost[v][P.goal_vertex] > P.goal_time) continue;
+  
+      route.push(v);
+      used[v] = true;
+      now_time = leave;
+    }
+  
+    route.push(P.goal_vertex);
+    return route;
+  }
+  
+  // ---------- neighbor 操作 ----------
+  function neighborRandomSwap(route) {
+    const n = route.length;
+    if (n <= 3) return [...route];
+    const r = [...route];
+    let i = randInt(1, n - 2);
+    let j = randInt(1, n - 2);
+    if (i !== j) [r[i], r[j]] = [r[j], r[i]];
+    return r;
+  }
+  
+  function neighborRemove(route) {
+    const n = route.length;
+    if (n <= 6) return [...route];
+    const r = [...route];
+    // ★ 1番〜(n-2)番目しか削除しない（最後の0は消さない）
+    const k = randInt(1, n - 2);
+    r.splice(k, 1);
+    return r;
+  }
+  
+  function neighborInsert(route, P) {
+    const n = route.length;
+    if (n <= 3) return [...route];
+    const r = [...route];
+    const inRoute = Array(P.N).fill(false);
+    route.forEach(v => inRoute[v] = true);
+    const unused = [];
+    for (let i = 0; i < P.N; i++) if (!inRoute[i]) unused.push(i);
+    if (unused.length === 0) return r;
+    const pick = unused[randInt(0, unused.length - 1)];
+    const ip = randInt(1, r.length - 1);
+    r.splice(ip, 0, pick);
+    return r;
+  }
+  
+  function neighborRelocate(route) {
+    const n = route.length;
+    if (n <= 3) return [...route];
+    const r = [...route];
+    let i = randInt(1, n - 2);
+    let j = randInt(1, n - 2);
+    while (i === j) j = randInt(1, n - 2);
+    const v = r[i];
+    r.splice(i, 1);
+    if (i < j) j--;
+    r.splice(j, 0, v);
+    return r;
+  }
+  
+  function neighbor2Opt(route) {
+    const n = route.length;
+    const r = [...route];
+    let i = randInt(1, n - 2);
+    let j = randInt(1, n - 2);
+    while (i === j) j = randInt(1, n - 2);
+    if (i > j) [i, j] = [j, i];
+    while (i < j) {
+      [r[i], r[j]] = [r[j], r[i]];
+      i++;
+      j--;
+    }
+    return r;
+  }
+  
+  function twoOptLocalSearch(P, order) {
+    const n = order.length;
+    let r = [...order];
+    let improved = true;
+    let curEval = evaluateRoute(P, r);
+  
+    while (improved) {
+      improved = false;
+      let bestGain = 0.0;
+      let bestI = -1, bestJ = -1;
+  
+      for (let i = 0; i < n - 2; i++) {
+        for (let j = i + 2; j < n - 1; j++) {
+          if (i === 0 && j === n - 1) continue;
+          const cand = [...r];
+          cand.splice(i + 1, j - i, ...cand.slice(i + 1, j + 1).reverse());
+          const ev = evaluateRoute(P, cand);
+          const gain = ev.score - curEval.score;
+          if (gain > bestGain) {
+            bestGain = gain;
+            bestI = i;
+            bestJ = j;
+          }
+        }
+      }
+  
+      if (bestGain > 1e-12) {
+        r.splice(bestI + 1, bestJ - bestI, ...r.slice(bestI + 1, bestJ + 1).reverse());
+        curEval = evaluateRoute(P, r);
+        improved = true;
+      }
+    }
+  
+    return r;
+  }
+  
+  // ---------- annealing 操作 ----------
+  async function simulatedAnnealing(P, time_limit_seconds) {
+    let cur = greedyInitial(P);
+    let curEval = evaluateRoute(P, cur);
+  
+    let best = [...cur];
+    let bestEval = {...curEval};
+  
+    const start = performance.now(); // ミリ秒
+    const limit_ns = time_limit_seconds * 1e3;
+  
+    let T0 = 50.0;
+    let decay = 0.99;
+    let T = T0;
+    let stall_count = 0;
+  
+    let iter = 0;
+  
+    while (true) {
+      iter++;
+      
+      // 非同期で描画の機会を与える
+      if(iter%10000 === 0) await new Promise(r => setTimeout(r, 0));
+  
+      const now = performance.now();
+      const elapsed = now - start;
+  
+      if (elapsed >= limit_ns) break;
+  
+      const mv = randInt(0, 99);
+      let cand;
+  
+      if (elapsed < time_limit_seconds * 0.4 * 1e3) {
+        //console.log(iter, "debug1");
+        if (mv < 20) cand = neighborRandomSwap(cur);
+        else if (mv < 40) cand = neighborRemove(cur);
+        else if (mv < 60) cand = neighborInsert(cur, P);
+        else if (mv < 80) cand = neighborRelocate(cur);
+        else cand = neighbor2Opt(cur);
+        if(iter%3000 == 0) cand = twoOptLocalSearch(P, cand);
+      } else if (elapsed < time_limit_seconds * 0.8 * 1e3) {
+        if (mv < 15) cand = neighborRandomSwap(cur);
+        else if (mv < 25) cand = neighborRemove(cur);
+        else if (mv < 40) cand = neighborInsert(cur, P);
+        else if (mv < 70) cand = neighborRelocate(cur);
+        else cand = neighbor2Opt(cur);
+        if(iter%800 == 0) cand = twoOptLocalSearch(P, cand);
+      } else {
+        if (mv < 60) cand = neighborRelocate(cur);
+        else cand = neighbor2Opt(cur);
+        if(iter%200 == 0) cand = twoOptLocalSearch(P, cand);
+      }
+  
+      const candEval = evaluateRoute(P, cand);
+      const delta = candEval.score - curEval.score;
+      let accept = false;
+  
+      if (delta >= 0) accept = true;
+      else if (Math.random() < Math.exp(delta / T)) accept = true;
+  
+      if (accept) {
+        cur = [...cand];
+        curEval = {...candEval};
+        if (curEval.score > bestEval.score) {
+          best = [...cur];
+          bestEval = {...curEval};
+          stall_count = 0;
+        } else stall_count++;
+      } else {
+        stall_count++;
+      }
+  
+      if (stall_count > 50) {
+        T = T0;
+        stall_count = 0;
+      } else {
+        T *= decay;
+      }
+    }
+  
+    return best;
+  }
+  
+  // ルート計算
+  function computeRouteByPreference() {
+    const repeat_num = 36;
+    const time_limit = 7.0; // 秒
+    const unit = time_limit / repeat_num;
+    
+    return new Promise(async resolve => {
+      let best = [];
+      let evalResult = null;
+    
+      for (let i = 0; i < repeat_num; i++) {
+        const cand = await simulatedAnnealing(P, unit);
+        const candEval = evaluateRoute(P, cand);
+    
+        if (i === 0) {
+          evalResult = candEval;
+          best = [...cand];
+        }
+        if (candEval.score > evalResult.score) {
+          evalResult = candEval;
+          best = [...cand];
+        }
+      }
+  
+      resolve(best);
+    });
+  }
+  
+  
+</script>
+<!-- ローディングオーバーレイ -->
+<div id="loading-overlay">
+  <img src="https://raw.githubusercontent.com/Romilli/Romilli.github.io/main/loading.gif" 
+       width="640" height="640">
+</div>
 </body>
 </html>
