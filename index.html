@@ -46,15 +46,8 @@
     header label { font-size: 14px; margin-right: 0px; }
     header input, header select { padding: 4px 6px; font-size: 14px; }
     header button {
-      background: #0078ff;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background 0.2s;
+      font-size: 14px;
     }
-    header button:hover { background: #005fcc; }
     
     /* 半改行 */
     .half-space { margin-bottom: 0.5em;}
@@ -122,6 +115,33 @@
       background-color: #f0f0f0;
     }
     
+    #preferenceBtn {
+      background: #FF8F22;
+      color: white;
+      border: none;
+      font-size: 16px;
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #preferenceBtn:hover {
+      background: #BF6A1A; /* 暗くする */
+    }
+    
+    #showRouteBtn {
+      background: #0078ff;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #showRouteBtn:hover {
+      background: #005fcc; /* 暗くする */
+    }
+    
     #showDetailsBtn {
       background: #00aa55;
       color: white;
@@ -150,14 +170,60 @@
       z-index: 9999;
       display: none;
     }
+    
+    #splash {
+      position: fixed;
+      inset: 0;               /* top:0 right:0 bottom:0 left:0 */
+      background: linear-gradient(135deg, #3498db, #2ecc71);
+      z-index: 9999;
+    
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .splash-content {
+      text-align: center;
+      color: white;
+    }
+    
+    .splash-content h1 {
+      font-size: 28px;
+      margin-bottom: 12px;
+    }
+    
+    .splash-content p {
+      font-size: 14px;
+      margin-bottom: 20px;
+      opacity: 0.9;
+    }
+    
+    .splash-content button {
+      font-size: 16px;
+      padding: 10px 24px;
+      border-radius: 24px;
+      border: none;
+      background: white;
+      color: #333;
+      cursor: pointer;
+    }
 
   </style>
 </head>
 <body>
   
+  <div id="splash">
+    <div class="splash-content">
+      <h1 style="font-size: 35px">ルート生成体験アプリ</h1>
+      <p>Designed & Developed by ODA</p>
+      <p>嗜好に合わせて最適な観光ルートを提案します</p>
+      <button id="startAppBtn">入力値を設定してルートを生成する</button>
+    </div>
+  </div>
+  
   <header>
     <button id="preferenceBtn">入力値を設定</button>
-    <button id="showRouteBtn">ルートを計算して表示</button>
+    <button id="showRouteBtn">ルートを生成</button>
     <button id="showDetailsBtn">時間割表示</button>
   </header>
 
@@ -194,6 +260,7 @@
       
       <label>始点:</label>
       <select id="start">
+        <option value="19">富山駅（きときと市場とやマルシェGOSHU）</option>
         <option value="0">富山市ガラス美術館</option>
         <option value="1">国宝高岡山瑞龍寺</option>
         <option value="2">富山県富岩運河環水公園</option>
@@ -213,7 +280,6 @@
         <option value="16">新湊大橋</option>
         <option value="17">池田屋安兵衛商店</option>
         <option value="18">富山ガラス工房</option>
-        <option value="19">きときと市場とやマルシェGOSHU</option>
         <option value="20">北前船回船問屋森家</option>
         <option value="21">チューリップ四季彩館</option>
         <option value="22">井波別院瑞泉寺</option>
@@ -265,6 +331,7 @@
       
       <label>終点:</label>
       <select id="end">
+        <option value="19">富山駅（きときと市場とやマルシェGOSHU）</option>
         <option value="0">富山市ガラス美術館</option>
         <option value="1">国宝高岡山瑞龍寺</option>
         <option value="2">富山県富岩運河環水公園</option>
@@ -284,7 +351,6 @@
         <option value="16">新湊大橋</option>
         <option value="17">池田屋安兵衛商店</option>
         <option value="18">富山ガラス工房</option>
-        <option value="19">きときと市場とやマルシェGOSHU</option>
         <option value="20">北前船回船問屋森家</option>
         <option value="21">チューリップ四季彩館</option>
         <option value="22">井波別院瑞泉寺</option>
@@ -441,9 +507,10 @@
       </select>
       <br>
       
+      <p style="text-decoration: underline;">※保存ボタンを押したらルートの生成へ進みましょう</p>
     
       <button id="saveBtn" style="
-        margin-top: 30px;
+        margin-top: 15px;
         padding: 8px 14px;
         font-size: 17px;
         border-radius: 8px;
@@ -478,7 +545,7 @@
   {    name: "新湊大橋",    address: "射水市海王町～海竜町",    lat: 36.7759,    lng: 137.115,    rev_val: 4.4,    rev_num: 386,    open_time: 360,    close_time: 1200,    req_time: 60,    view_pt: [2, 3, 1, 0, 1, 0, 0, 2, 2, 2]  },
   {    name: "池田屋安兵衛商店",    address: "富山市堤町通り1-3-5",    lat: 36.6885,    lng: 137.218,    rev_val: 4.2,    rev_num: 100,    open_time: 540,    close_time: 1080,    req_time: 20,    view_pt: [0, 2, 2, 2, 1, 2, 2, 2, 1, 2]  },
   {    name: "富山ガラス工房",    address: "富山市古沢152",    lat: 36.6953,    lng: 137.146,    rev_val: 4.1,    rev_num: 342,    open_time: 540,    close_time: 1020,    req_time: 30,    view_pt: [1, 1, 0, 2, 3, 0, 2, 3, 3, 2]  },
-  {    name: "きときと市場とやマルシェGOSHU",    address: "富山市明輪町1-220",    lat: 36.701,    lng: 137.214,    rev_val: 4.1,    rev_num: 17,    open_time: 540,    close_time: 1230,    req_time: 20,    view_pt: [0, 1, 0, 1, 1, 3, 3, 0, 0, 0]  },
+  {    name: "富山駅（きときと市場とやマルシェGOSHU）",    address: "富山市明輪町1-220",    lat: 36.701,    lng: 137.214,    rev_val: 4.1,    rev_num: 17,    open_time: 540,    close_time: 1230,    req_time: 20,    view_pt: [0, 1, 0, 1, 1, 3, 3, 0, 0, 0]  },
   {    name: "北前船回船問屋森家",    address: "富山市東岩瀬町108",    lat: 36.7568,    lng: 137.229,    rev_val: 3.9,    rev_num: 520,    open_time: 540,    close_time: 1020,    req_time: 30,    view_pt: [1, 2, 3, 3, 2, 0, 1, 2, 1, 2]  },
   {    name: "チューリップ四季彩館",    address: "砺波市中村100番地1",    lat: 36.6411,    lng: 136.965,    rev_val: 4.2,    rev_num: 325,    open_time: 540,    close_time: 1080,    req_time: 60,    view_pt: [2, 3, 0, 2, 2, 1, 2, 2, 2, 3]  },
   {    name: "井波別院瑞泉寺",    address: "南砺市井波305",    lat: 36.5588,    lng: 136.972,    rev_val: 4.3,    rev_num: 724,    open_time: 540,    close_time: 990,    req_time: 30,    view_pt: [2, 3, 3, 2, 2, 0, 1, 2, 1, 3]  },
@@ -545,6 +612,7 @@
     start_time: 540.0, // 例: 9:00
     goal_time: 1200.0, // 例: 20:00
     prefers: [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1], // ユーザー嗜好
+    //prefers: [0,0,0,0,0,0,0,0,0,0],
     review_val: locations.map(l => l.rev_val),
     review_num: locations.map(l => l.rev_num),
     open_time: locations.map(l => [l.open_time, l.close_time]),
@@ -569,8 +637,8 @@
     style: `https://api.maptiler.com/maps/streets-v4/style.json?key=${MAPTILER_KEY}`,
     center: [137.2137, 36.6952],
     zoom: 9,
-    maxZoom: 18,
-    minZoom: 5,
+    maxZoom: 15,
+    minZoom: 9,
   });
   
   const ROUTE_JSON_URL = "https://raw.githubusercontent.com/Romilli/Romilli.github.io/main/all_routes_polyline.json";
@@ -729,29 +797,46 @@
   function drawPins(order) {
     clearMarkers();
   
+    const isSameStartEnd = order.length >= 2 && order[0] === order[order.length - 1];
+    const lastStep = order.length;
+  
     order.forEach((idx, step) => {
+      // ★ 最後のピンをスキップ（始点＝終点のとき）
+      if (isSameStartEnd && step === order.length - 1) return;
+  
       const loc = locations[idx];
       if (!loc) return;
   
-      const color = colors[step % colors.length];
       const position = [loc.lng, loc.lat];
   
       const markerEl = document.createElement("div");
-      markerEl.style.width = "20px";
+  
+      // ===== 見た目 =====
       markerEl.style.height = "20px";
-      markerEl.style.borderRadius = "50%";
-      markerEl.style.backgroundColor = color;
       markerEl.style.border = "2px solid white";
       markerEl.style.color = "white";
-      markerEl.style.fontSize = "15px";
+      markerEl.style.fontSize = "13px";
       markerEl.style.fontWeight = "bold";
       markerEl.style.display = "flex";
       markerEl.style.justifyContent = "center";
       markerEl.style.alignItems = "center";
       markerEl.style.cursor = "pointer";
-      markerEl.innerText = step + 1;
+      markerEl.style.whiteSpace = "nowrap";
   
-      // ★ ポップアップ（地点名のみ）
+      // ===== 特殊ケース：始点＝終点 =====
+      if (isSameStartEnd && step === 0) {
+        markerEl.style.width = "38px";
+        markerEl.style.borderRadius = "12px"; // ← 楕円
+        markerEl.style.backgroundColor = colors[0];
+        markerEl.innerText = `1 | ${lastStep}`;
+      } else {
+        markerEl.style.width = "20px";
+        markerEl.style.borderRadius = "50%";
+        markerEl.style.backgroundColor = colors[step % colors.length];
+        markerEl.innerText = step + 1;
+      }
+  
+      // ===== ポップアップ =====
       const popup = new maplibregl.Popup({
         anchor: "bottom",
         offset: 20,
@@ -761,7 +846,7 @@
   
       const marker = new maplibregl.Marker({ element: markerEl })
         .setLngLat(position)
-        .setPopup(popup) // ← これを追加
+        .setPopup(popup)
         .addTo(map);
   
       markers.push(marker);
@@ -857,7 +942,7 @@
        出発地点
     ========================= */
     table.push([
-      P.pos_names[route[0]][0],
+      "1 " + P.pos_names[route[0]][0],
       "出発",
       "",
       formatTime(now_time),
@@ -894,7 +979,7 @@
       const depart = formatTime(now_time);
   
       table.push([
-        P.pos_names[cur][0],
+        String(i+1) + " " + P.pos_names[cur][0],
         `${Math.floor(P.required_time[cur])}分`,
         arrive,
         depart,
@@ -919,7 +1004,7 @@
   
     // 到着
     table.push([
-      P.pos_names[route[last]][0],
+      String(routeNum) + " " + P.pos_names[route[last]][0],
       "到着",
       formatTime(now_time),
       "",
@@ -1014,7 +1099,7 @@
       P.prefers[i] = value;
     }
   
-    console.log("保存された嗜好:", P.prefers);
+    alert('入力を保存しました');
     preferenceModal.style.display = "none";
   });
   
@@ -1022,6 +1107,14 @@
   /* =========================================================
      ------ ボタンイベント（全体） ------
   ========================================================= */
+  
+  document.getElementById("startAppBtn").addEventListener("click", () => {
+    const splash = document.getElementById("splash");
+    splash.style.display = "none";
+  
+    // 念のため一番上へ
+    window.scrollTo({ top: 0 });
+  });
   
   document.getElementById("showRouteBtn").addEventListener("click", async () => {
     
