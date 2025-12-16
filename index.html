@@ -1047,7 +1047,7 @@
     const hh = hour < 10 ? `0${hour}` : `${hour}`;
     const mm = minute < 10 ? `0${minute}` : `${minute}`;
     return `${hh}:${mm}`;
-}
+  }
 
   
   /* =========================================================
@@ -1090,6 +1090,18 @@
     if (!saved) return null;
     return JSON.parse(saved);
   }
+  function loadPos() {
+    const saved = localStorage.getItem("user_pos");
+    if (!saved) return null;
+    return JSON.parse(saved);
+  }
+  function loadTime() {
+    const saved = localStorage.getItem("user_time");
+    if (!saved) return null;
+    const t = JSON.parse(saved);
+    const res = [formatTime(t[0]), formatTime(t[1])];
+    return res;
+  }
 
   
   const preferenceModal = document.getElementById("preferenceModal");
@@ -1102,13 +1114,40 @@
     preferenceModal.style.display = "block";
   
     const savedPref = loadPref();
-    if (!savedPref) return;
-  
-    for (let i = 0; i < 10; i++) {
-      const select = document.querySelector(`#pref${i}`);
-      if (select && savedPref[i] !== undefined) {
-        select.value = savedPref[i];
+    const savedPos = loadPos();
+    const savedTime = loadTime();
+    if (savedPref){
+      for (let i = 0; i < 10; i++) {
+        const select1 = document.querySelector(`#pref${i}`);
+        if (select1 && savedPref[i] !== undefined) {
+          select1.value = savedPref[i];
+        }
       }
+      console.log("cck1");
+    }
+    if (savedPos){
+      let select2 = document.querySelector("#start");
+      if (select2 && savedPos[0] !== undefined) {
+        select2.value = savedPos[0];
+      }
+      
+      select2 = document.querySelector("#end");
+      if (select2 && savedPos[1] !== undefined) {
+        select2.value = savedPos[1];
+      }
+      console.log("cck2");
+    }
+    if (savedTime){
+      let select3 = document.querySelector("#startTime");
+      if (select3 && savedTime[0] !== undefined) {
+        select3.value = savedTime[0];
+      }
+      
+      select3 = document.querySelector("#endTime");
+      if (select3 && savedTime[1] !== undefined) {
+        select3.value = savedTime[1];
+      }
+      console.log("cck3");
     }
   });
 
@@ -1145,7 +1184,11 @@
     }
   
     alert('入力を保存しました');
+    const pos = [P.start_vertex, P.goal_vertex];
+    const ts = [P.start_time, P.goal_time];
     localStorage.setItem("user_pref", JSON.stringify(P.prefers));
+    localStorage.setItem("user_pos", JSON.stringify(pos));
+    localStorage.setItem("user_time", JSON.stringify(ts));
     preferenceModal.style.display = "none";
   });
   
