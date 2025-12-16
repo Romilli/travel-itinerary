@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8"/>
-  <title>情報観光ルート班</title>
+  <title>ルート表示（ローカルJSON＋訪問順マーカー）</title>
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1, viewport-fit=cover"
@@ -46,7 +46,7 @@
     header label { font-size: 14px; margin-right: 0px; }
     header input, header select { padding: 4px 6px; font-size: 14px; }
     header button {
-      font-size: 14px;
+      font-size: 16px;
     }
     
     /* 半改行 */
@@ -133,7 +133,7 @@
       background: #0078ff;
       color: white;
       border: none;
-      padding: 6px 12px;
+      padding: 8px 14px;
       border-radius: 4px;
       cursor: pointer;
       transition: background 0.2s;
@@ -146,7 +146,7 @@
       background: #00aa55;
       color: white;
       border: none;
-      padding: 6px 12px;
+      padding: 8px 14px;
       border-radius: 4px;
       cursor: pointer;
       transition: background 0.2s;
@@ -171,21 +171,48 @@
       display: none;
     }
     
+    /*#splash {*/
+    /*  position: fixed;*/
+      /*inset: 0; */
+    /*  background: linear-gradient(135deg, #3498db, #2ecc71);*/
+    /*  z-index: 9999;*/
+    
+    /*  display: flex;*/
+    /*  align-items: center;*/
+    /*  justify-content: center;*/
+    /*}*/
+    
     #splash {
       position: fixed;
-      inset: 0;               /* top:0 right:0 bottom:0 left:0 */
-      background: linear-gradient(135deg, #3498db, #2ecc71);
+      inset: 0;
       z-index: 9999;
+    
+      background-image: url("https://raw.githubusercontent.com/Romilli/travel-itinerary/main/title-back.JPG");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
     
       display: flex;
       align-items: center;
       justify-content: center;
     }
+
     
     .splash-content {
-      text-align: center;
-      color: white;
-    }
+  text-align: center;
+  color: white;
+
+  background: linear-gradient(
+    135deg,
+    rgba(52, 152, 219, 0.85),
+    rgba(46, 204, 113, 0.85)
+  );
+
+  padding: 32px 40px;
+  border-radius: 20px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+}
+
     
     .splash-content h1 {
       font-size: 28px;
@@ -214,17 +241,17 @@
   
   <div id="splash">
     <div class="splash-content">
-      <h1 style="font-size: 35px">ルート生成体験アプリ</h1>
-      <p>Designed & Developed by ODA</p>
-      <p>嗜好に合わせて最適な観光ルートを提案します</p>
-      <button id="startAppBtn">入力値を設定してルートを生成する</button>
+      <h1 style="font-size: 30px">ルート生成体験アプリ</h1>
+      <p style="text-decoration: underline;">Designed & Developed by ODA</p>
+      <p>嗜好に合わせて富山の観光ルートを提案します</p>
+      <button id="startAppBtn">さっそくはじめる</button>
     </div>
   </div>
   
   <header>
-    <button id="preferenceBtn">入力値を設定</button>
-    <button id="showRouteBtn">ルートを生成</button>
-    <button id="showDetailsBtn">時間割表示</button>
+    <button id="preferenceBtn" style="text-decoration: underline;">まず入力する</button>
+    <button id="showRouteBtn">ルート生成</button>
+    <button id="showDetailsBtn">時間割</button>
   </header>
 
   <div id="map"></div>
@@ -641,7 +668,7 @@
     minZoom: 8,
   });
   
-  const ROUTE_JSON_URL = "https://raw.githubusercontent.com/Romilli/Romilli.github.io/main/all_routes_polyline.json";
+  const ROUTE_JSON_URL = "https://raw.githubusercontent.com/Romilli/travel-itinerary/main/all_routes_polyline.json";
   
   let routeData = {};
   
@@ -1058,6 +1085,13 @@
      ------ 嗜好パラメータモーダル処理 ------
   ========================================================= */
   
+  function loadPref() {
+    const saved = localStorage.getItem("user_pref");
+    if (!saved) return null;
+    return JSON.parse(saved);
+  }
+
+  
   const preferenceModal = document.getElementById("preferenceModal");
   const openPreferenceButton = document.getElementById("preferenceBtn");
   const closePreferenceButton = document.getElementById("closePrefModal");
@@ -1066,7 +1100,18 @@
   // 開く
   openPreferenceButton.addEventListener("click", () => {
     preferenceModal.style.display = "block";
+  
+    const savedPref = loadPref();
+    if (!savedPref) return;
+  
+    for (let i = 0; i < 10; i++) {
+      const select = document.querySelector(`#pref${i}`);
+      if (select && savedPref[i] !== undefined) {
+        select.value = savedPref[i];
+      }
+    }
   });
+
   
   // 閉じる
   closePreferenceButton.addEventListener("click", () => {
@@ -1100,6 +1145,7 @@
     }
   
     alert('入力を保存しました');
+    localStorage.setItem("user_pref", JSON.stringify(P.prefers));
     preferenceModal.style.display = "none";
   });
   
@@ -1111,9 +1157,17 @@
   document.getElementById("startAppBtn").addEventListener("click", () => {
     const splash = document.getElementById("splash");
     splash.style.display = "none";
-  
     // 念のため一番上へ
     window.scrollTo({ top: 0 });
+    
+    const savedPref = loadPref();
+    if (!savedPref) return;
+  
+    for (let i = 0; i < 10; i++) {
+      if (savedPref[i] !== undefined) {
+        P.prefers[i] = savedPref[i];
+      }
+    }
   });
   
   document.getElementById("showRouteBtn").addEventListener("click", async () => {
@@ -1495,7 +1549,7 @@
 </script>
 <!-- ローディングオーバーレイ -->
 <div id="loading-overlay">
-  <img src="https://raw.githubusercontent.com/Romilli/Romilli.github.io/main/loading.gif" 
+  <img src="https://raw.githubusercontent.com/Romilli/travel-itinerary/main/loading.gif" 
        width="640" height="640">
 </div>
 </body>
